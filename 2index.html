@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaCheck - Smart Water Analyzer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: #020c14; color: #e8f4ff; min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; font-size: 3rem; margin-bottom: 10px; }
+        h1 span { color: #00c6ff; }
+        .subtitle { text-align: center; color: #5b8fa8; margin-bottom: 20px; }
+        
+        .card { background: #0a2235; border: 1px solid rgba(0,198,255,0.2); border-radius: 20px; padding: 25px; margin-bottom: 20px; }
+        
+        /* Hardware Connection Panel */
+        .hardware-panel { 
+            background: linear-gradient(135deg, #0a2235, #061825); 
+            border: 2px solid #00c6ff; 
+            border-radius: 15px; 
+            padding: 20px; 
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 25px;
+            margin: 10px 0;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4d6d;
+            animation: pulse 2s infinite;
+        }
+        .status-dot.connected { background: #00e5a0; animation: none; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .connect-btn {
+            background: linear-gradient(135deg, #0072ff, #00c6ff);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 0.95rem;
+        }
+        .connect-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,198,255,0.3); }
+        .connect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Live Sensor Readings */
+        .live-sensors {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            animation: fadeIn 0.5s;
+        }
+        .live-sensors.active { display: grid; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .sensor-card {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,198,255,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .sensor-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #0072ff, #00c6ff);
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .sensor-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00c6ff;
+            margin: 10px 0;
+        }
+        .sensor-label {
+            font-size: 0.8rem;
+            color: #5b8fa8;
+            text-transform: uppercase;
+        }
+        .sensor-unit {
+            font-size: 0.9rem;
+            color: #5b8fa8;
+        }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        
+        .field { background: #020c14; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,198,255,0.1); position: relative; }
+        .field label { display: block; color: #5b8fa8; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
+        .field input { width: 100%; background: transparent; border: 1px solid rgba(0,198,255,0.2); border-radius: 8px; padding: 10px; color: white; font-size: 1rem; }
+        .field input:focus { outline: none; border-color: #00c6ff; }
+        .field input.sensor-input { border-color: #00e5a0; background: rgba(0,229,160,0.05); }
+        .field .limit { font-size: 0.7rem; color: #5b8fa8; margin-top: 5px; }
+        .sensor-icon {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #333;
+        }
+        .sensor-icon.active { background: #00e5a0; box-shadow: 0 0 10px #00e5a0; animation: blink 1s infinite; }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { flex: 1; min-width: 200px; padding: 18px; background: linear-gradient(135deg, #0072ff, #00c6ff); border: none; border-radius: 14px; color: white; font-size: 1rem; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        button:hover { transform: translateY(-2px); }
+        button.secondary { background: #061825; border: 1px solid rgba(0,198,255,0.3); }
+        
+        .result { margin-top: 20px; padding: 30px; border-radius: 20px; text-align: center; display: none; }
+        .result.show { display: block; animation: slideIn 0.5s; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .result.safe { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.3); }
+        .result.unsafe { background: rgba(255,77,109,0.1); border: 1px solid rgba(255,77,109,0.3); }
+        .result h2 { font-size: 2.5rem; margin-bottom: 10px; }
+        .result.safe h2 { color: #00e5a0; }
+        .result.unsafe h2 { color: #ff4d6d; }
+        .result .wqi { font-size: 1.2rem; color: #5b8fa8; }
+        
+        .issues { margin-top: 20px; text-align: left; }
+        .issues h3 { color: #5b8fa8; font-size: 0.9rem; margin-bottom: 10px; text-transform: uppercase; }
+        .issue { background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .issue span:last-child { color: #ff4d6d; }
+        
+        .presets { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        .presets button { flex: 0 1 auto; min-width: auto; padding: 10px 20px; font-size: 0.85rem; background: #061825; border: 1px solid rgba(0,198,255,0.2); }
+        .presets button:hover { background: rgba(0,198,255,0.1); }
+        
+        .gauge-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
+        .gauge { background: #061825; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid rgba(0,198,255,0.1); }
+        .gauge-value { font-size: 2rem; font-weight: bold; color: #00c6ff; }
+        .gauge-label { font-size: 0.75rem; color: #5b8fa8; margin-top: 5px; text-transform: uppercase; }
+        .gauge-status { font-size: 0.7rem; margin-top: 5px; padding: 3px 10px; border-radius: 20px; display: inline-block; }
+        .gauge-status.safe { background: rgba(0,229,160,0.2); color: #00e5a0; }
+        .gauge-status.warning { background: rgba(255,174,25,0.2); color: #ffae19; }
+        .gauge-status.danger { background: rgba(255,77,109,0.2); color: #ff4d6d; }
+        
+        /* Calibration Panel */
+        .calibration { 
+            background: rgba(255,174,25,0.1); 
+            border: 1px solid rgba(255,174,25,0.3); 
+            border-radius: 12px; 
+            padding: 15px; 
+            margin-top: 15px;
+            display: none;
+        }
+        .calibration.show { display: block; }
+        .calibration h4 { color: #ffae19; margin-bottom: 10px; font-size: 0.9rem; }
+        .calibration ol { margin-left: 20px; color: #5b8fa8; font-size: 0.85rem; }
+        .calibration li { margin-bottom: 5px; }
+        
+        .data-log { 
+            background: rgba(0,0,0,0.3); 
+            border-radius: 10px; 
+            padding: 15px; 
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #5b8fa8;
+            display: none;
+        }
+        .data-log.show { display: block; }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Aqua<span>Check</span></h1>
+        <p class="subtitle">Civil & IS Interdisciplinary Project - Smart Water Quality Monitoring</p>
+        
+        <!-- Hardware Connection Panel -->
+        <div class="hardware-panel">
+            <h3 style="color: #00c6ff; margin-bottom: 10px;">🔌 Arduino Sensor Integration</h3>
+            <p style="color: #5b8fa8; font-size: 0.9rem; margin-bottom: 15px;">
+                Connect your Arduino water quality probe via USB for real-time sensor readings
+            </p>
+            
+            <div class="connection-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            
+            <div>
+                <button class="connect-btn" id="connectBtn" onclick="connectArduino()">
+                    🔗 Connect Arduino
+                </button>
+                <button class="connect-btn secondary" onclick="toggleCalibration()">
+                    ⚙️ Calibration Guide
+                </button>
+                <button class="connect-btn secondary" onclick="toggleDataLog()">
+                    📊 View Data Log
+                </button>
+            </div>
+            
+            <div class="calibration" id="calibrationPanel">
+                <h4>📋 Civil Engineering: Sensor Calibration Protocol</h4>
+                <ol>
+                    <li><strong>pH Sensor:</strong> Calibrate using pH 4.0, 7.0, and 10.0 buffer solutions</li>
+                    <li><strong>TDS Sensor:</strong> Use 1000ppm NaCl standard solution for calibration</li>
+                    <li><strong>Turbidity:</strong> Use 0 NTU (distilled water) and 100 NTU standards</li>
+                    <li><strong>Temperature:</strong> Verify with calibrated thermometer at 25°C</li>
+                    <li>Allow 2 minutes warm-up time before taking readings</li>
+                    <li>Rinse probe with distilled water between different samples</li>
+                </ol>
+                <p style="color: #5b8fa8; font-size: 0.8rem; margin-top: 10px;">
+                    <strong>Civil Note:</strong> Sensor placement depth and flow velocity affect readings. 
+                    Ensure representative sampling location.
+                </p>
+            </div>
+            
+            <div class="data-log" id="dataLog">
+                <div style="color: #00c6ff; margin-bottom: 10px;">📡 Serial Data Stream:</div>
+                <div id="logContent"></div>
+            </div>
+            
+            <!-- Live Sensor Readings -->
+            <div class="live-sensors" id="liveSensors">
+                <div class="sensor-card">
+                    <div class="sensor-label">🔬 pH Level</div>
+                    <div class="sensor-value" id="livePH">--</div>
+                    <div class="sensor-unit">pH</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">💧 Turbidity</div>
+                    <div class="sensor-value" id="liveTurbidity">--</div>
+                    <div class="sensor-unit">NTU</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">⚡ TDS</div>
+                    <div class="sensor-value" id="liveTDS">--</div>
+                    <div class="sensor-unit">ppm</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">🌡️ Temperature</div>
+                    <div class="sensor-value" id="liveTemp">--</div>
+                    <div class="sensor-unit">°C</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="presets">
+                <button onclick="loadPreset('tap')">💧 Tap Water</button>
+                <button onclick="loadPreset('spring')">🏔️ Spring Water</button>
+                <button onclick="loadPreset('polluted')">☣️ Polluted Lake</button>
+                <button onclick="loadPreset('borewell')">🪨 Hard Borewell</button>
+                <button onclick="loadPreset('bellandur')">🇮🇳 Bellandur Lake</button>
+            </div>
+            
+            <div class="grid">
+                <div class="field">
+                    <div class="sensor-icon" id="icon-ph"></div>
+                    <label>pH Level (0-14)</label>
+                    <input type="number" id="ph" step="0.01" value="7.2">
+                    <div class="limit">Safe: 6.5 - 8.5 | <span style="color:#00e5a0">Auto-filled from sensor</span></div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-hardness"></div>
+                    <label>Hardness (mg/L)</label>
+                    <input type="number" id="hardness" step="0.1" value="165">
+                    <div class="limit">Safe: 75 - 250</div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-solids"></div>
+                    <label>TDS/Solids (ppm)</label>
+                    <input type="number" id="solids" step="0.1" value="310">
+                    <div class="limit">Safe: &lt; 1000 | <span style="color:#00e5a0">Auto-filled from sensor</span></div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-chloramines"></div>
+                    <label>Chloramines (ppm)</label>
+                    <input type="number" id="chloramines" step="0.01" value="2.1">
+                    <div class="limit">Safe: 0.2 - 4.0</div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-sulfate"></div>
+                    <label>Sulfate (mg/L)</label>
+                    <input type="number" id="sulfate" step="0.1" value="65">
+                    <div class="limit">Safe: &lt; 250</div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-conductivity"></div>
+                    <label>Conductivity (μS/cm)</label>
+                    <input type="number" id="conductivity" step="0.1" value="245">
+                    <div class="limit">Safe: &lt; 400 | <span style="color:#00e5a0">Auto-filled from sensor</span></div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-organic_carbon"></div>
+                    <label>Organic Carbon (ppm)</label>
+                    <input type="number" id="organic_carbon" step="0.01" value="1.25">
+                    <div class="limit">Safe: &lt; 4.0</div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-trihalomethanes"></div>
+                    <label>Trihalomethanes (μg/L)</label>
+                    <input type="number" id="trihalomethanes" step="0.1" value="35">
+                    <div class="limit">Safe: &lt; 80</div>
+                </div>
+                <div class="field">
+                    <div class="sensor-icon" id="icon-turbidity"></div>
+                    <label>Turbidity (NTU)</label>
+                    <input type="number" id="turbidity" step="0.01" value="0.72">
+                    <div class="limit">Safe: &lt; 5.0 | <span style="color:#00e5a0">Auto-filled from sensor</span></div>
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <button onclick="analyze()">🔬 Analyze Water Sample</button>
+                <button class="secondary" onclick="importFromSensors()">📥 Import from Sensors</button>
+                <button class="secondary" onclick="exportData()">📤 Export Report</button>
+            </div>
+            
+            <div id="result" class="result"></div>
+            <div id="gauges"></div>
+        </div>
+        
+        <!-- Arduino Setup Instructions -->
+        <div class="card">
+            <h3 style="color: #00c6ff; margin-bottom: 15px;">🔧 Civil Engineering: Arduino Hardware Setup</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; color: #5b8fa8; font-size: 0.9rem;">
+                <div>
+                    <h4 style="color: #00e5a0; margin-bottom: 10px;">Required Components</h4>
+                    <ul style="margin-left: 20px; line-height: 1.8;">
+                        <li>Arduino Uno/Nano</li>
+                        <li>Analog pH Sensor (Gravity)</li>
+                        <li>Turbidity Sensor (TS-300B)</li>
+                        <li>TDS Sensor Module</li>
+                        <li>DS18B20 Temperature Probe</li>
+                        <li>ESP8266 WiFi Module (optional)</li>
+                        <li>Waterproof Enclosure (IP65)</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #00e5a0; margin-bottom: 10px;">Sensor Placement</h4>
+                    <ul style="margin-left: 20px; line-height: 1.8;">
+                        <li><strong>Rivers:</strong> 30cm below surface, mid-stream</li>
+                        <li><strong>Lakes:</strong> Avoid stagnant areas, near inflow</li>
+                        <li><strong>Borewells:</strong> Pump discharge point</li>
+                        <li><strong>Taps:</strong> After 2 minutes of flow</li>
+                        <li>Secure mounting to prevent movement</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #00e5a0; margin-bottom: 10px;">Data Transmission</h4>
+                    <ul style="margin-left: 20px; line-height: 1.8;">
+                        <li>USB Serial (direct connection)</li>
+                        <li>Bluetooth HC-05 (wireless)</li>
+                        <li>WiFi ESP8266 (remote monitoring)</li>
+                        <li>JSON format for compatibility</li>
+                        <li>2-second sampling interval</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Guidelines
+        const guidelines = {
+            ph: { min: 6.5, max: 8.5, name: 'pH' },
+            hardness: { min: 75, max: 250, name: 'Hardness' },
+            solids: { min: 50, max: 1000, name: 'TDS' },
+            chloramines: { min: 0.2, max: 4.0, name: 'Chloramines' },
+            sulfate: { min: 0, max: 250, name: 'Sulfate' },
+            conductivity: { min: 50, max: 400, name: 'Conductivity' },
+            organic_carbon: { min: 0.1, max: 4.0, name: 'Organic Carbon' },
+            trihalomethanes: { min: 0, max: 80, name: 'THMs' },
+            turbidity: { min: 0, max: 5.0, name: 'Turbidity' }
+        };
+
+        // Presets
+        const presets = {
+            tap: { ph: 7.15, hardness: 165, solids: 310, chloramines: 2.1, sulfate: 65, conductivity: 245, organic_carbon: 1.25, trihalomethanes: 35, turbidity: 0.72 },
+            spring: { ph: 7.35, hardness: 85, solids: 120, chloramines: 0.25, sulfate: 18, conductivity: 110, organic_carbon: 0.45, trihalomethanes: 4.8, turbidity: 0.35 },
+            polluted: { ph: 4.8, hardness: 380, solids: 1850, chloramines: 6.8, sulfate: 490, conductivity: 1150, organic_carbon: 9.4, trihalomethanes: 125, turbidity: 9.45 },
+            borewell: { ph: 7.05, hardness: 485, solids: 1250, chloramines: 0, sulfate: 185, conductivity: 1680, organic_carbon: 2.1, trihalomethanes: 0, turbidity: 1.2 },
+            bellandur: { ph: 8.85, hardness: 445, solids: 2850, chloramines: 0.45, sulfate: 285, conductivity: 1850, organic_carbon: 18.5, trihalomethanes: 65, turbidity: 12.8 }
+        };
+
+        // Web Serial API for Arduino
+        let port;
+        let reader;
+        let isConnected = false;
+
+        async function connectArduino() {
+            try {
+                // Request serial port
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                
+                isConnected = true;
+                updateConnectionStatus(true);
+                
+                // Start reading data
+                readSerialData();
+                
+                // Show live sensors
+                document.getElementById('liveSensors').classList.add('active');
+                
+                logData("✅ Arduino connected successfully");
+            } catch (error) {
+                alert("Failed to connect: " + error.message);
+                logData("❌ Connection failed: " + error.message);
+            }
+        }
+
+        async function readSerialData() {
+            while (port.readable) {
+                const textDecoder = new TextDecoderStream();
+                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                reader = textDecoder.readable.getReader();
+                
+                try {
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        
+                        // Parse JSON data from Arduino
+                        try {
+                            const data = JSON.parse(value);
+                            updateLiveSensors(data);
+                            logData("📡 " + value.trim());
+                        } catch (e) {
+                            // Non-JSON data, log as raw
+                            if(value.trim()) logData(value.trim());
+                        }
+                    }
+                } catch (error) {
+                    console.error(error);
+                } finally {
+                    reader.releaseLock();
+                }
+            }
+        }
+
+        function updateLiveSensors(data) {
+            // Update live display cards
+            if(data.ph !== undefined) {
+                document.getElementById('livePH').textContent = data.ph.toFixed(2);
+                highlightField('ph', true);
+            }
+            if(data.turbidity !== undefined) {
+                document.getElementById('liveTurbidity').textContent = data.turbidity.toFixed(2);
+                highlightField('turbidity', true);
+            }
+            if(data.tds !== undefined) {
+                document.getElementById('liveTDS').textContent = data.tds.toFixed(0);
+                document.getElementById('liveConductivity').textContent = (data.tds * 1.5).toFixed(0);
+                highlightField('solids', true);
+                highlightField('conductivity', true);
+            }
+            if(data.temperature !== undefined) {
+                document.getElementById('liveTemp').textContent = data.temperature.toFixed(1);
+            }
+        }
+
+        function highlightField(fieldId, active) {
+            const input = document.getElementById(fieldId);
+            const icon = document.getElementById('icon-' + fieldId);
+            if(active) {
+                input.classList.add('sensor-input');
+                icon.classList.add('active');
+            } else {
+                input.classList.remove('sensor-input');
+                icon.classList.remove('active');
+            }
+        }
+
+        function importFromSensors() {
+            // Import live values to form fields
+            const livePH = document.getElementById('livePH').textContent;
+            const liveTurbidity = document.getElementById('liveTurbidity').textContent;
+            const liveTDS = document.getElementById('liveTDS').textContent;
+            const liveConductivity = document.getElementById('liveConductivity').textContent;
+            
+            if(livePH !== '--') document.getElementById('ph').value = livePH;
+            if(liveTurbidity !== '--') document.getElementById('turbidity').value = liveTurbidity;
+            if(liveTDS !== '--') document.getElementById('solids').value = liveTDS;
+            if(liveConductivity !== '--') document.getElementById('conductivity').value = liveConductivity;
+            
+            alert("✅ Sensor data imported! Click 'Analyze' to see results.");
+            logData("📥 Sensor data imported to form fields");
+        }
+
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            const btn = document.getElementById('connectBtn');
+            
+            if(connected) {
+                dot.classList.add('connected');
+                text.textContent = 'Connected to Arduino';
+                btn.textContent = '🔗 Disconnect';
+                btn.onclick = disconnectArduino;
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = 'Disconnected';
+                btn.textContent = '🔗 Connect Arduino';
+                btn.onclick = connectArduino;
+            }
+        }
+
+        async function disconnectArduino() {
+            if(reader) {
+                await reader.cancel();
+            }
+            if(port) {
+                await port.close();
+            }
+            isConnected = false;
+            updateConnectionStatus(false);
+            document.getElementById('liveSensors').classList.remove('active');
+            logData("🔌 Arduino disconnected");
+        }
+
+        function toggleCalibration() {
+            const panel = document.getElementById('calibrationPanel');
+            panel.classList.toggle('show');
+        }
+
+        function toggleDataLog() {
+            const log = document.getElementById('dataLog');
+            log.classList.toggle('show');
+        }
+
+        function logData(message) {
+            const logContent = document.getElementById('logContent');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${time}] ${message}`;
+            logContent.insertBefore(entry, logContent.firstChild);
+            
+            // Keep only last 50 entries
+            while(logContent.children.length > 50) {
+                logContent.removeChild(logContent.lastChild);
+            }
+        }
+
+        function loadPreset(name) {
+            const p = presets[name];
+            for (let key in p) {
+                document.getElementById(key).value = p[key];
+                highlightField(key, false);
+            }
+            analyze();
+        }
+
+        function analyze() {
+            const params = {};
+            let score = 100;
+            const failures = [];
+            
+            for (let key in guidelines) {
+                params[key] = parseFloat(document.getElementById(key).value) || 0;
+                const g = guidelines[key];
+                if (params[key] < g.min || params[key] > g.max) {
+                    score -= 11;
+                    failures.push({ name: g.name, value: params[key], min: g.min, max: g.max });
+                }
+            }
+            
+            const wqi = Math.max(0, score);
+            const isSafe = wqi >= 70 && failures.filter(f => f.value > f.max * 1.5).length === 0;
+            
+            // Result display
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result ' + (isSafe ? 'safe' : 'unsafe') + ' show';
+            resultDiv.innerHTML = `
+                <h2>${isSafe ? '✅ Safe to Drink' : '⚠️ Unsafe'}</h2>
+                <div class="wqi">Water Quality Index: ${wqi}/100</div>
+                ${isConnected ? '<div style="color: #00e5a0; margin-top: 10px;">📡 Verified with Arduino Sensors</div>' : ''}
+                ${failures.length > 0 ? `
+                    <div class="issues">
+                        <h3>Parameters Out of Range:</h3>
+                        ${failures.map(f => `
+                            <div class="issue">
+                                <span>${f.name}</span>
+                                <span>${f.value} (Safe: ${f.min}-${f.max})</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
+            
+            // Gauges
+            const gaugesDiv = document.getElementById('gauges');
+            gaugesDiv.className = 'gauge-container';
+            gaugesDiv.innerHTML = Object.keys(guidelines).map(key => {
+                const val = params[key];
+                const g = guidelines[key];
+                let status = 'safe';
+                let statusText = 'SAFE';
+                if (val < g.min || val > g.max) {
+                    if (val < g.min * 0.8 || val > g.max * 1.2) {
+                        status = 'danger';
+                        statusText = 'CRITICAL';
+                    } else {
+                        status = 'warning';
+                        statusText = 'WARNING';
+                    }
+                }
+                return `
+                    <div class="gauge">
+                        <div class="gauge-value">${val.toFixed(1)}</div>
+                        <div class="gauge-label">${g.name}</div>
+                        <span class="gauge-status ${status}">${statusText}</span>
+                    </div>
+                `;
+            }).join('');
+            
+            if(isConnected) {
+                logData(`✅ Analysis complete: WQI ${wqi}/100 - ${isSafe ? 'SAFE' : 'UNSAFE'}`);
+            }
+        }
+
+        function exportData() {
+            const params = {};
+            for (let key in guidelines) {
+                params[key] = document.getElementById(key).value;
+            }
+            
+            const report = {
+                timestamp: new Date().toISOString(),
+                location: "Sample Location",
+                parameters: params,
+                wqi: calculateWQI(params),
+                device: isConnected ? "Arduino Sensor" : "Manual Entry"
+            };
+            
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `water-quality-report-${Date.now()}.json`;
+            a.click();
+            
+            logData("📤 Report exported to JSON");
+        }
+
+        function calculateWQI(params) {
+            let score = 100;
+            for (let key in guidelines) {
+                const g = guidelines[key];
+                const val = parseFloat(params[key]) || 0;
+                if (val < g.min || val > g.max) score -= 11;
+            }
+            return Math.max(0, score);
+        }
+
+        // Auto-connect if previously connected
+        window.addEventListener('beforeunload', () => {
+            if(isConnected) disconnectArduino();
+        });
+    </script>
+</body>
+</html>
