@@ -1,10 +1,185 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>AquaCheck</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaCheck - Water Analyzer</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+        body{background:#020c14;color:#e8f4ff;min-height:100vh;padding:20px}
+        .container{max-width:1000px;margin:0 auto}
+        h1{text-align:center;font-size:2.5rem;margin-bottom:5px}
+        h1 span{color:#00c6ff}
+        .subtitle{text-align:center;color:#5b8fa8;margin-bottom:20px;font-size:0.9rem}
+        .card{background:#0a2235;border:1px solid rgba(0,198,255,0.2);border-radius:15px;padding:20px;margin-bottom:15px}
+        
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:15px}
+        .field{background:#020c14;padding:12px;border-radius:10px;border:1px solid rgba(0,198,255,0.1)}
+        .field label{display:block;color:#5b8fa8;font-size:0.75rem;text-transform:uppercase;margin-bottom:4px;font-weight:600}
+        .field input{width:100%;background:transparent;border:1px solid rgba(0,198,255,0.2);border-radius:6px;padding:10px;color:#fff;font-size:1rem}
+        .field .limit{font-size:0.7rem;color:#5b8fa8;margin-top:4px}
+        
+        .presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:15px;justify-content:center}
+        .presets button{padding:8px 15px;font-size:0.8rem;background:#061825;border:1px solid rgba(0,198,255,0.2);color:#fff;border-radius:20px;cursor:pointer}
+        .presets button:hover{background:rgba(0,198,255,0.1)}
+        
+        button.main{width:100%;padding:15px;background:linear-gradient(135deg,#0072ff,#00c6ff);border:none;border-radius:12px;color:#fff;font-size:1rem;font-weight:bold;cursor:pointer;margin-top:10px}
+        button.main:hover{transform:translateY(-2px)}
+        
+        .result{margin-top:15px;padding:25px;border-radius:15px;text-align:center;display:none}
+        .result.show{display:block}
+        .result.safe{background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3)}
+        .result.unsafe{background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3)}
+        .result h2{font-size:2.5rem;margin-bottom:10px}
+        .result.safe h2{color:#00e5a0}
+        .result.unsafe h2{color:#ff4d6d}
+        .wqi{color:#5b8fa8;font-size:1.2rem;margin-bottom:15px}
+        
+        .issues{margin-top:15px;text-align:left}
+        .issues h3{color:#5b8fa8;font-size:0.85rem;margin-bottom:10px;text-transform:uppercase}
+        .issue{background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;font-size:0.9rem}
+        .issue span:first-child{text-transform:capitalize}
+        .issue span:last-child{color:#ff4d6d;font-weight:bold}
+        
+        .gauges{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:15px}
+        .gauge{background:#061825;padding:15px;border-radius:10px;text-align:center;border:1px solid rgba(0,198,255,0.1)}
+        .gauge-value{font-size:1.8rem;font-weight:bold;color:#00c6ff}
+        .gauge-label{font-size:0.7rem;color:#5b8fa8;margin-top:4px;text-transform:uppercase}
+        .gauge-status{font-size:0.65rem;margin-top:5px;padding:3px 10px;border-radius:15px;display:inline-block;font-weight:bold}
+        .status-safe{background:rgba(0,229,160,0.2);color:#00e5a0}
+        .status-warn{background:rgba(255,174,25,0.2);color:#ffae19}
+        .status-danger{background:rgba(255,77,109,0.2);color:#ff4d6d}
+    </style>
 </head>
-<body style="background:#020c14; color:#00c6ff; font-family:Arial; text-align:center; padding:50px;">
-    <h1>AquaCheck Works!</h1>
-    <p>Water Quality Analyzer</p>
+<body>
+    <div class="container">
+        <h1>Aqua<span>Check</span></h1>
+        <p class="subtitle">Water Potability Analyzer - Civil & IS Project</p>
+        
+        <div class="card">
+            <div class="presets">
+                <button onclick="load('tap')">💧 Tap Water</button>
+                <button onclick="load('spring')">🏔️ Spring Water</button>
+                <button onclick="load('polluted')">☣️ Polluted Lake</button>
+                <button onclick="load('borewell')">🪨 Borewell</button>
+                <button onclick="load('bellandur')">🇮🇳 Bellandur</button>
+            </div>
+            
+            <div class="grid">
+                <div class="field"><label>pH Level</label><input type="number" id="ph" step="0.01" value="7.2"><div class="limit">Safe: 6.5 - 8.5</div></div>
+                <div class="field"><label>Hardness (mg/L)</label><input type="number" id="hardness" step="0.1" value="165"><div class="limit">Safe: 75 - 250</div></div>
+                <div class="field"><label>TDS/Solids (ppm)</label><input type="number" id="solids" step="0.1" value="310"><div class="limit">Safe: &lt; 1000</div></div>
+                <div class="field"><label>Chloramines (ppm)</label><input type="number" id="chloramines" step="0.01" value="2.1"><div class="limit">Safe: 0.2 - 4.0</div></div>
+                <div class="field"><label>Sulfate (mg/L)</label><input type="number" id="sulfate" step="0.1" value="65"><div class="limit">Safe: &lt; 250</div></div>
+                <div class="field"><label>Conductivity (μS/cm)</label><input type="number" id="conductivity" step="0.1" value="245"><div class="limit">Safe: &lt; 400</div></div>
+                <div class="field"><label>Organic Carbon (ppm)</label><input type="number" id="organic_carbon" step="0.01" value="1.25"><div class="limit">Safe: &lt; 4.0</div></div>
+                <div class="field"><label>Trihalomethanes (μg/L)</label><input type="number" id="trihalomethanes" step="0.1" value="35"><div class="limit">Safe: &lt; 80</div></div>
+                <div class="field"><label>Turbidity (NTU)</label><input type="number" id="turbidity" step="0.01" value="0.72"><div class="limit">Safe: &lt; 5.0</div></div>
+            </div>
+            
+            <button class="main" onclick="analyze()">🔬 Analyze Water Sample</button>
+            
+            <div id="result" class="result">
+                <h2 id="verdict"></h2>
+                <div class="wqi" id="wqi"></div>
+                <div id="issues"></div>
+            </div>
+            <div id="gauges" class="gauges"></div>
+        </div>
+    </div>
+
+    <script>
+        const guidelines = {
+            ph: { min: 6.5, max: 8.5, name: 'pH' },
+            hardness: { min: 75, max: 250, name: 'Hardness' },
+            solids: { min: 50, max: 1000, name: 'TDS' },
+            chloramines: { min: 0.2, max: 4, name: 'Chloramines' },
+            sulfate: { min: 0, max: 250, name: 'Sulfate' },
+            conductivity: { min: 50, max: 400, name: 'Conductivity' },
+            organic_carbon: { min: 0.1, max: 4, name: 'Organic Carbon' },
+            trihalomethanes: { min: 0, max: 80, name: 'THMs' },
+            turbidity: { min: 0, max: 5, name: 'Turbidity' }
+        };
+
+        const presets = {
+            tap: { ph: 7.15, hardness: 165, solids: 310, chloramines: 2.1, sulfate: 65, conductivity: 245, organic_carbon: 1.25, trihalomethanes: 35, turbidity: 0.72 },
+            spring: { ph: 7.35, hardness: 85, solids: 120, chloramines: 0.25, sulfate: 18, conductivity: 110, organic_carbon: 0.45, trihalomethanes: 4.8, turbidity: 0.35 },
+            polluted: { ph: 4.8, hardness: 380, solids: 1850, chloramines: 6.8, sulfate: 490, conductivity: 1150, organic_carbon: 9.4, trihalomethanes: 125, turbidity: 9.45 },
+            borewell: { ph: 7.05, hardness: 485, solids: 1250, chloramines: 0, sulfate: 185, conductivity: 1680, organic_carbon: 2.1, trihalomethanes: 0, turbidity: 1.2 },
+            bellandur: { ph: 8.85, hardness: 445, solids: 2850, chloramines: 0.45, sulfate: 285, conductivity: 1850, organic_carbon: 18.5, trihalomethanes: 65, turbidity: 12.8 }
+        };
+
+        function load(name) {
+            const p = presets[name];
+            for (let key in p) {
+                document.getElementById(key).value = p[key];
+            }
+            analyze();
+        }
+
+        function analyze() {
+            let score = 100;
+            let failures = [];
+            let gaugesHTML = '';
+
+            for (let key in guidelines) {
+                const val = parseFloat(document.getElementById(key).value) || 0;
+                const g = guidelines[key];
+                const isSafe = val >= g.min && val <= g.max;
+                
+                if (!isSafe) {
+                    score -= 11;
+                    failures.push({ name: g.name, value: val, min: g.min, max: g.max });
+                }
+
+                // Determine status
+                let statusClass = 'status-safe';
+                let statusText = 'SAFE';
+                if (!isSafe) {
+                    if (val < g.min * 0.7 || val > g.max * 1.3) {
+                        statusClass = 'status-danger';
+                        statusText = 'CRITICAL';
+                    } else {
+                        statusClass = 'status-warn';
+                        statusText = 'WARNING';
+                    }
+                }
+
+                gaugesHTML += `
+                    <div class="gauge">
+                        <div class="gauge-value">${val.toFixed(1)}</div>
+                        <div class="gauge-label">${g.name}</div>
+                        <span class="gauge-status ${statusClass}">${statusText}</span>
+                    </div>
+                `;
+            }
+
+            const wqi = Math.max(0, score);
+            const isSafe = wqi >= 70 && !failures.some(f => f.value > guidelines[Object.keys(guidelines).find(k => guidelines[k].name === f.name)].max * 1.5);
+
+            // Show result
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result show ' + (isSafe ? 'safe' : 'unsafe');
+            document.getElementById('verdict').textContent = isSafe ? '✅ Safe to Drink' : '⚠️ Unsafe';
+            document.getElementById('wqi').textContent = 'Water Quality Index: ' + wqi + '/100';
+
+            // Show issues
+            let issuesHTML = '';
+            if (failures.length > 0) {
+                issuesHTML = '<div class="issues"><h3>Parameters Out of Range:</h3>';
+                for (let f of failures) {
+                    issuesHTML += `<div class="issue"><span>${f.name}</span><span>${f.value} (Safe: ${f.min}-${f.max})</span></div>`;
+                }
+                issuesHTML += '</div>';
+            }
+            document.getElementById('issues').innerHTML = issuesHTML;
+
+            // Show gauges
+            document.getElementById('gauges').innerHTML = gaugesHTML;
+        }
+
+        // Auto-analyze on load
+        window.onload = analyze;
+    </script>
 </body>
 </html>
