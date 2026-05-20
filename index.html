@@ -1,16 +1,237 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AquaCheck — Water Potability Analyzer & AI Assistant</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-[#020c14] text-[#e8f4ff]">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaCheck</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+        body{background:#020c14;color:#e8f4ff;min-height:100vh;padding:20px}
+        .container{max-width:1000px;margin:0 auto}
+        h1{text-align:center;font-size:2.5rem}h1 span{color:#00c6ff}
+        .subtitle{text-align:center;color:#5b8fa8;margin-bottom:20px;font-size:0.9rem}
+        .card{background:#0a2235;border:1px solid rgba(0,198,255,0.2);border-radius:15px;padding:20px;margin-bottom:15px}
+        
+        .hardware-panel{background:linear-gradient(135deg,#0a2235,#061825);border:2px solid #00c6ff;border-radius:12px;padding:15px;margin-bottom:15px;text-align:center}
+        .connection-status{display:inline-flex;align-items:center;gap:8px;padding:8px 15px;background:rgba(0,0,0,0.3);border-radius:20px;margin:8px 0;font-size:0.85rem}
+        .status-dot{width:10px;height:10px;border-radius:50%;background:#ff4d6d}
+        .status-dot.connected{background:#00e5a0}
+        .connect-btn{background:linear-gradient(135deg,#0072ff,#00c6ff);border:none;padding:10px 20px;border-radius:20px;color:#fff;font-weight:bold;cursor:pointer;margin:5px;font-size:0.85rem}
+        .connect-btn:hover{transform:translateY(-2px)}
+        
+        .live-sensors{display:none;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:15px}
+        .live-sensors.active{display:grid}
+        .sensor-card{background:rgba(0,0,0,0.3);border:1px solid rgba(0,198,255,0.2);border-radius:10px;padding:12px;text-align:center}
+        .sensor-value{font-size:1.5rem;font-weight:bold;color:#00c6ff}
+        .sensor-label{font-size:0.7rem;color:#5b8fa8;text-transform:uppercase}
+        
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:15px}
+        .field{background:#020c14;padding:12px;border-radius:10px;border:1px solid rgba(0,198,255,0.1)}
+        .field label{display:block;color:#5b8fa8;font-size:0.7rem;text-transform:uppercase;margin-bottom:4px;font-weight:600}
+        .field input{width:100%;background:transparent;border:1px solid rgba(0,198,255,0.2);border-radius:6px;padding:8px;color:#fff;font-size:0.95rem}
+        .field input.sensor-input{border-color:#00e5a0;background:rgba(0,229,160,0.05)}
+        .field .limit{font-size:0.65rem;color:#5b8fa8;margin-top:4px}
+        .sensor-icon{float:right;width:8px;height:8px;border-radius:50%;background:#333;margin-top:-20px}
+        .sensor-icon.active{background:#00e5a0;box-shadow:0 0 8px #00e5a0}
+        
+        button{width:100%;padding:15px;background:linear-gradient(135deg,#0072ff,#00c6ff);border:none;border-radius:12px;color:#fff;font-size:1rem;font-weight:bold;cursor:pointer;margin-top:10px}
+        button:hover{transform:translateY(-2px)}
+        .btn-secondary{background:#061825;border:1px solid rgba(0,198,255,0.3)}
+        
+        .presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:15px;justify-content:center}
+        .presets button{flex:0 1 auto;min-width:auto;padding:8px 15px;font-size:0.8rem;background:#061825;border:1px solid rgba(0,198,255,0.2);width:auto}
+        
+        .result{margin-top:15px;padding:20px;border-radius:15px;text-align:center;display:none}
+        .result.show{display:block}
+        .result.safe{background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3)}
+        .result.unsafe{background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3)}
+        .result h2{font-size:2rem;margin-bottom:8px}
+        .result.safe h2{color:#00e5a0}
+        .result.unsafe h2{color:#ff4d6d}
+        .wqi{color:#5b8fa8;font-size:1rem}
+        
+        .issues{margin-top:15px;text-align:left}
+        .issues h3{color:#5b8fa8;font-size:0.8rem;margin-bottom:8px}
+        .issue{background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;font-size:0.9rem}
+        .issue span:last-child{color:#ff4d6d}
+        
+        .gauge-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:15px}
+        .gauge{background:#061825;padding:15px;border-radius:10px;text-align:center;border:1px solid rgba(0,198,255,0.1)}
+        .gauge-value{font-size:1.5rem;font-weight:bold;color:#00c6ff}
+        .gauge-label{font-size:0.7rem;color:#5b8fa8;margin-top:4px;text-transform:uppercase}
+        .gauge-status{font-size:0.65rem;margin-top:4px;padding:2px 8px;border-radius:15px;display:inline-block}
+        .gauge-status.safe{background:rgba(0,229,160,0.2);color:#00e5a0}
+        .gauge-status.warning{background:rgba(255,174,25,0.2);color:#ffae19}
+        .gauge-status.danger{background:rgba(255,77,109,0.2);color:#ff4d6d}
+        
+        .calibration{background:rgba(255,174,25,0.1);border:1px solid rgba(255,174,25,0.3);border-radius:10px;padding:12px;margin-top:10px;display:none;text-align:left;font-size:0.8rem}
+        .calibration.show{display:block}
+        .calibration h4{color:#ffae19;margin-bottom:8px;font-size:0.85rem}
+        .calibration ol{margin-left:18px;color:#5b8fa8}
+        .calibration li{margin-bottom:4px}
+        
+        .data-log{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;margin-top:10px;max-height:120px;overflow-y:auto;font-family:monospace;font-size:0.75rem;color:#5b8fa8;display:none}
+        .data-log.show{display:block}
+        .log-entry{margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:2px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Aqua<span>Check</span></h1>
+        <p class="subtitle">Civil & IS Project - Smart Water Monitoring</p>
+        
+        <div class="hardware-panel">
+            <h3 style="color:#00c6ff;margin-bottom:8px;font-size:1rem;">🔌 Arduino Sensor Integration</h3>
+            <div class="connection-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div>
+                <button class="connect-btn" onclick="connectArduino()">🔗 Connect Arduino</button>
+                <button class="connect-btn btn-secondary" onclick="toggleCalibration()">⚙️ Calibration</button>
+            </div>
+            <div class="calibration" id="calibrationPanel">
+                <h4>📋 Civil Engineering: Calibration Protocol</h4>
+                <ol>
+                    <li><strong>pH:</strong> Use pH 4.0, 7.0, 10.0 buffer solutions</li>
+                    <li><strong>TDS:</strong> Use 1000ppm NaCl standard</li>
+                    <li><strong>Turbidity:</strong> Use 0 NTU and 100 NTU standards</li>
+                    <li>Warm up 2 minutes before readings</li>
+                    <li>Rinse with distilled water between samples</li>
+                </ol>
+            </div>
+            <div class="data-log" id="dataLog"><div id="logContent"></div></div>
+            
+            <div class="live-sensors" id="liveSensors">
+                <div class="sensor-card"><div class="sensor-label">pH</div><div class="sensor-value" id="livePH">--</div></div>
+                <div class="sensor-card"><div class="sensor-label">Turbidity</div><div class="sensor-value" id="liveTurbidity">--</div></div>
+                <div class="sensor-card"><div class="sensor-label">TDS</div><div class="sensor-value" id="liveTDS">--</div></div>
+                <div class="sensor-card"><div class="sensor-label">Temp</div><div class="sensor-value" id="liveTemp">--</div></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="presets">
+                <button onclick="loadPreset('tap')">💧 Tap</button>
+                <button onclick="loadPreset('spring')">🏔️ Spring</button>
+                <button onclick="loadPreset('polluted')">☣️ Polluted</button>
+                <button onclick="loadPreset('borewell')">🪨 Borewell</button>
+                <button onclick="loadPreset('bellandur')">🇮🇳 Bellandur</button>
+            </div>
+            
+            <div class="grid">
+                <div class="field"><div class="sensor-icon" id="icon-ph"></div><label>pH (0-14)</label><input type="number" id="ph" step="0.01" value="7.2"><div class="limit">Safe: 6.5-8.5</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-hardness"></div><label>Hardness (mg/L)</label><input type="number" id="hardness" step="0.1" value="165"><div class="limit">Safe: 75-250</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-solids"></div><label>TDS (ppm)</label><input type="number" id="solids" step="0.1" value="310"><div class="limit">Safe: <1000</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-chloramines"></div><label>Chloramines (ppm)</label><input type="number" id="chloramines" step="0.01" value="2.1"><div class="limit">Safe: 0.2-4.0</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-sulfate"></div><label>Sulfate (mg/L)</label><input type="number" id="sulfate" step="0.1" value="65"><div class="limit">Safe: <250</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-conductivity"></div><label>Conductivity (μS/cm)</label><input type="number" id="conductivity" step="0.1" value="245"><div class="limit">Safe: <400</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-organic_carbon"></div><label>Organic C (ppm)</label><input type="number" id="organic_carbon" step="0.01" value="1.25"><div class="limit">Safe: <4.0</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-trihalomethanes"></div><label>THMs (μg/L)</label><input type="number" id="trihalomethanes" step="0.1" value="35"><div class="limit">Safe: <80</div></div>
+                <div class="field"><div class="sensor-icon" id="icon-turbidity"></div><label>Turbidity (NTU)</label><input type="number" id="turbidity" step="0.01" value="0.72"><div class="limit">Safe: <5.0</div></div>
+            </div>
+            
+            <button onclick="analyze()">🔬 Analyze Sample</button>
+            <button class="btn-secondary" onclick="importSensors()" style="margin-top:8px">📥 Import from Sensors</button>
+            
+            <div id="result" class="result"></div>
+            <div id="gauges"></div>
+        </div>
+    </div>
+
+    <script>
+        const guidelines={ph:{min:6.5,max:8.5},hardness:{min:75,max:250},solids:{min:50,max:1000},chloramines:{min:0.2,max:4},sulfate:{min:0,max:250},conductivity:{min:50,max:400},organic_carbon:{min:0.1,max:4},trihalomethanes:{min:0,max:80},turbidity:{min:0,max:5}};
+        const presets={tap:{ph:7.15,hardness:165,solids:310,chloramines:2.1,sulfate:65,conductivity:245,organic_carbon:1.25,trihalomethanes:35,turbidity:0.72},spring:{ph:7.35,hardness:85,solids:120,chloramines:0.25,sulfate:18,conductivity:110,organic_carbon:0.45,trihalomethanes:4.8,turbidity:0.35},polluted:{ph:4.8,hardness:380,solids:1850,chloramines:6.8,sulfate:490,conductivity:1150,organic_carbon:9.4,trihalomethanes:125,turbidity:9.45},borewell:{ph:7.05,hardness:485,solids:1250,chloramines:0,sulfate:185,conductivity:1680,organic_carbon:2.1,trihalomethanes:0,turbidity:1.2},bellandur:{ph:8.85,hardness:445,solids:2850,chloramines:0.45,sulfate:285,conductivity:1850,organic_carbon:18.5,trihalomethanes:65,turbidity:12.8}};
+        let port,reader,isConnected=false;
+        
+        async function connectArduino(){
+            try{
+                port=await navigator.serial.requestPort();
+                await port.open({baudRate:9600});
+                isConnected=true;
+                updateStatus(true);
+                document.getElementById('liveSensors').classList.add('active');
+                readData();
+            }catch(e){alert('Connection failed: '+e.message)}
+        }
+        
+        async function readData(){
+            while(port.readable){
+                const decoder=new TextDecoderStream();
+                port.readable.pipeTo(decoder.writable);
+                reader=decoder.readable.getReader();
+                try{
+                    while(true){
+                        const {value,done}=await reader.read();
+                        if(done)break;
+                        try{
+                            const data=JSON.parse(value);
+                            if(data.ph){document.getElementById('livePH').textContent=data.ph.toFixed(2);highlight('ph')}
+                            if(data.turbidity){document.getElementById('liveTurbidity').textContent=data.turbidity.toFixed(2);highlight('turbidity')}
+                            if(data.tds){document.getElementById('liveTDS').textContent=data.tds.toFixed(0);document.getElementById('liveConductivity').textContent=(data.tds*1.5).toFixed(0);highlight('solids');highlight('conductivity')}
+                            if(data.temperature)document.getElementById('liveTemp').textContent=data.temperature.toFixed(1);
+                            log(value.trim());
+                        }catch(e){if(value.trim())log(value.trim())}
+                    }
+                }catch(e){console.error(e)}finally{reader.releaseLock()}
+            }
+        }
+        
+        function highlight(id){
+            document.getElementById(id).classList.add('sensor-input');
+            document.getElementById('icon-'+id).classList.add('active');
+        }
+        
+        function importSensors(){
+            const ph=document.getElementById('livePH').textContent;
+            const tur=document.getElementById('liveTurbidity').textContent;
+            const tds=document.getElementById('liveTDS').textContent;
+            const cond=document.getElementById('liveConductivity').textContent;
+            if(ph!=='--')document.getElementById('ph').value=ph;
+            if(tur!=='--')document.getElementById('turbidity').value=tur;
+            if(tds!=='--')document.getElementById('solids').value=tds;
+            if(cond!=='--')document.getElementById('conductivity').value=cond;
+            alert('Sensor data imported!');
+        }
+        
+        function updateStatus(conn){
+            const dot=document.getElementById('statusDot'),text=document.getElementById('statusText');
+            if(conn){dot.classList.add('connected');text.textContent='Connected'}else{dot.classList.remove('connected');text.textContent='Disconnected'}
+        }
+        
+        function toggleCalibration(){document.getElementById('calibrationPanel').classList.toggle('show')}
+        function toggleDataLog(){document.getElementById('dataLog').classList.toggle('show')}
+        function log(msg){
+            const logContent=document.getElementById('logContent'),entry=document.createElement('div');
+            entry.className='log-entry';entry.textContent='['+new Date().toLocaleTimeString()+'] '+msg;
+            logContent.insertBefore(entry,logContent.firstChild);
+            while(logContent.children.length>20)logContent.removeChild(logContent.lastChild);
+        }
+        
+        function loadPreset(name){
+            const p=presets[name];
+            for(let key in p){document.getElementById(key).value=p[key];document.getElementById(key).classList.remove('sensor-input');document.getElementById('icon-'+key).classList.remove('active')}
+            analyze();
+        }
+        
+        function analyze(){
+            let score=100,failures=[];
+            for(let key in guidelines){
+                const val=parseFloat(document.getElementById(key).value)||0,g=guidelines[key];
+                if(val<g.min||val>g.max){score-=11;failures.push({name:key,value:val})}
+            }
+            const wqi=Math.max(0,score),isSafe=wqi>=70;
+            const result=document.getElementById('result');
+            result.className='result '+(isSafe?'safe':'unsafe')+' show';
+            result.innerHTML='<h2>'+(isSafe?'✅ Safe':'⚠️ Unsafe')+'</h2><div class="wqi">WQI: '+wqi+'/100</div>'+(isConnected?'<div style="color:#00e5a0;margin-top:8px;font-size:0.9rem">📡 Arduino Verified</div>':'')+(failures.length?'<div class="issues"><h3>Issues:</h3>'+failures.map(f=>'<div class="issue"><span>'+f.name+'</span><span>'+f.value+'</span></div>').join('')+'</div>':'');
+            
+            document.getElementById('gauges').innerHTML=Object.keys(guidelines).map(k=>{
+                const val=parseFloat(document.getElementById(k).value)||0,g=guidelines[k];
+                let status='safe',text='SAFE';
+                if(val<g.min||val>g.max){status=(val<g.min*0.8||val>g.max*1.2)?'danger':'warning';text=status==='danger'?'CRITICAL':'WARNING'}
+                return'<div class="gauge"><div class="gauge-value">'+val.toFixed(1)+'</div><div class="gauge-label">'+k.replace('_',' ')+'</div><span class="gauge-status '+status+'">'+text+'</span></div>'
+            }).join('');
+        }
+    </script>
+</body>
 </html>
